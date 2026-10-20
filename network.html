@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <!-- I used IA to make this code-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internet Network Packet Simulator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        cyber: {
+                            bg: '#0a0d14',
+                            card: '#121824',
+                            border: '#1e293b',
+                            accent: '#00f2fe',
+                            http: '#10b981', // green
+                            dns: '#f59e0b',  // amber
+                            tcp: '#3b82f6',  // blue
+                            tls: '#a855f7',  // purple
+                            icmp: '#06b6d4', // cyan
+                            udp: '#ec4899',  // pink
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom scrollbar for modern dark theme */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Pulsing animations and glows */
+        .glow-cyan {
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.25);
+        }
+        .glow-green {
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);
+        }
+        .glow-red {
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 0.4; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .animated-pulse-ring {
+            animation: pulse-ring 2s infinite ease-in-out;
+        }
+
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+<body class="bg-cyber-bg text-slate-200 font-sans min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black">
+
+    <!-- HEADER SECTION -->
+    <header class="bg-slate-900/90 border-b border-slate-800 backdrop-blur-md sticky top-0 z-40 px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            
+            <!-- Branding / Title -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 text-xl font-bold shadow-lg shadow-cyan-500/20">
+                    <i class="fa-solid font-mono fa-network-wired"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                        Internet Network Packet Simulator
+                        <span class="text-xs bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full font-mono font-normal">v2.4 Live</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Interactive OSI Layer, Routing & Packet Flow Visualizer</p>
+                </div>
+            </div>
+
+            <!-- Global Live Statistics Badges -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-xs">
+                <div class="bg-slate-800/80 border border-slate-700/60 rounded-lg px-3 py-1.5 flex flex-col items-center">
+                    <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Sent</span>
+                    <span id="stat-sent" class="text-cyan-400 font-mono font-bold text-sm">0</span>
+                </div>
+                <div class="bg-slate-800/80 border border-slate-700/60 rounded-lg px-3 py-1.5 flex flex-col items-center">
+                    <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Delivered</span>
+                    <span id="stat-delivered" class="text-emerald-400 font-mono font-bold text-sm">0</span>
+                </div>
+                <div class="bg-slate-800/80 border border-slate-700/60 rounded-lg px-3 py-1.5 flex flex-col items-center">
+                    <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Dropped</span>
+                    <span id="stat-dropped" class="text-rose-400 font-mono font-bold text-sm">0</span>
+                </div>
+                <div class="bg-slate-800/80 border border-slate-700/60 rounded-lg px-3 py-1.5 flex flex-col items-center">
+                    <span class="text-slate-400 text-[10px] uppercase tracking-wider font-semibold">Avg Latency</span>
+                    <span id="stat-latency" class="text-amber-400 font-mono font-bold text-sm">0ms</span>
+                </div>
+            </div>
+
+            <!-- Controls / Utilities -->
+            <div class="flex items-center gap-2">
+                <button id="btn-pause" onclick="togglePauseSimulation()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 flex items-center gap-2 transition">
+                    <i id="icon-pause" class="fa-solid fa-pause"></i> <span id="label-pause">Pause</span>
+                </button>
+                <button onclick="clearSimulationStats()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/40 border border-slate-700 hover:border-rose-800/50 text-xs text-slate-300 hover:text-rose-300 flex items-center gap-2 transition">
+                    <i class="fa-solid fa-rotate-left"></i> Reset
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- NAVIGATION TABS BAR -->
+    <nav class="bg-slate-900 border-b border-slate-800 px-4">
+        <div class="max-w-7xl mx-auto flex items-center space-x-1 sm:space-x-4 overflow-x-auto py-2 text-xs font-medium scrollbar-none">
+            <button onclick="switchView('topology')" id="tab-topology" class="nav-tab active px-3 py-2 rounded-lg text-cyan-400 bg-cyan-950/40 border border-cyan-500/30 flex items-center gap-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-diagram-project"></i> Network Topology View
+            </button>
+            <button onclick="switchView('osi')" id="tab-osi" class="nav-tab px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center gap-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-layer-group"></i> OSI & Encapsulation Breakdown
+            </button>
+            <button onclick="switchView('wireshark')" id="tab-wireshark" class="nav-tab px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center gap-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-[#00a3e0] fa-list-check"></i> Live Packet Capture (Wireshark)
+            </button>
+            <button onclick="switchView('guide')" id="tab-guide" class="nav-tab px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center gap-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-book-open"></i> Educational Guide
+            </button>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 space-y-5">
+
+        <!-- VIEW 1: NETWORK TOPOLOGY VIEW -->
+        <section id="view-topology" class="space-y-5">
+            
+            <!-- Canvas Simulation Box -->
+            <div class="bg-cyber-card border border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative">
+                <!-- Canvas Bar Header Overlay -->
+                <div class="bg-slate-900/80 backdrop-blur border-b border-slate-800/80 px-4 py-2.5 flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-3">
+                        <span class="flex items-center gap-2 font-mono text-slate-300">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Network Active
+                        </span>
+                        <span class="text-slate-500">|</span>
+                        <span class="text-slate-400 hidden sm:inline">Click any node to view configuration & IP stats</span>
+                    </div>
+
+                    <!-- Protocol Palette Legend -->
+                    <div class="flex items-center gap-3 text-[11px] font-mono">
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> HTTP</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> DNS</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span> TCP</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></span> TLS</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block"></span> ICMP</span>
+                    </div>
+                </div>
+
+                <!-- Main Interactive HTML5 Canvas -->
+                <div class="relative w-full h-[360px] sm:h-[420px] bg-[#070a10]">
+                    <canvas id="networkCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+                    
+                    <!-- Quick Node Info Tooltip overlay -->
+                    <div id="nodeTooltip" class="hidden absolute pointer-events-none bg-slate-900/95 border border-cyan-500/40 rounded-lg p-2.5 text-xs shadow-xl z-20 space-y-1 backdrop-blur max-w-xs">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Grid: Controls, Inspector, Logs -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                <!-- Left 7 Cols: Controls & Packet Injection -->
+                <div class="lg:col-span-7 space-y-5">
+                    
+                    <!-- Preset Scenario Launcher -->
+                    <div class="bg-cyber-card border border-slate-800 rounded-xl p-4 space-y-3">
+                        <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-bolt text-amber-400"></i> Preset Traffic Scenarios
+                        </h2>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <button onclick="launchScenario('http')" class="group p-2.5 bg-slate-800/80 hover:bg-emerald-950/40 border border-slate-700/80 hover:border-emerald-500/50 rounded-lg text-left transition flex flex-col justify-between">
+                                <span class="text-xs font-semibold text-slate-200 group-hover:text-emerald-400 flex items-center justify-between">
+                                    HTTP GET Request
+                                    <i class="fa-solid fa-globe text-slate-500 group-hover:text-emerald-400 text-xs"></i>
+                                </span>
+                                <span class="text-[10px] text-slate-400 mt-1">Client → Web Server (Port 80)</span>
+                            </button>
+
+                            <button onclick="launchScenario('dns')" class="group p-2.5 bg-slate-800/80 hover:bg-amber-950/40 border border-slate-700/80 hover:border-amber-500/50 rounded-lg text-left transition flex flex-col justify-between">
+                                <span class="text-xs font-semibold text-slate-200 group-hover:text-amber-400 flex items-center justify-between">
+                                    DNS Resolution
+                                    <i class="fa-solid fa-magnifying-glass text-slate-500 group-hover:text-amber-400 text-xs"></i>
+                                </span>
+                                <span class="text-[10px] text-slate-400 mt-1">UDP Query → 8.8.8.8</span>
+                            </button>
+
+                            <button onclick="launchScenario('tcp')" class="group p-2.5 bg-slate-800/80 hover:bg-blue-950/40 border border-slate-700/80 hover:border-blue-500/50 rounded-lg text-left transition flex flex-col justify-between">
+                                <span class="text-xs font-semibold text-slate-200 group-hover:text-blue-400 flex items-center justify-between">
+                                    TCP 3-Way Handshake
+                                    <i class="fa-solid fa-handshake text-slate-500 group-hover:text-blue-400 text-xs"></i>
+                                </span>
+                                <span class="text-[10px] text-slate-400 mt-1">SYN → SYN-ACK → ACK</span>
+                            </button>
+
+                            <button onclick="launchScenario('tls')" class="group p-2.5 bg-slate-800/80 hover:bg-purple-950/40 border border-slate-700/80 hover:border-purple-500/50 rounded-lg text-left transition flex flex-col justify-between">
+                                <span class="text-xs font-semibold text-slate-200 group-hover:text-purple-400 flex items-center justify-between">
+                                    TLS/HTTPS Session
+                                    <i class="fa-solid fa-lock text-slate-500 group-hover:text-purple-400 text-xs"></i>
+                                </span>
+                                <span class="text-[10px] text-slate-400 mt-1">ClientHello → Key Exchange</span>
+                            </button>
+
+                            <button onclick="launchScenario('icmp')" class="group p-2.5 bg-slate-800/80 hover:bg-cyan-950/40 border border-slate-700/80 hover:border-cyan-500/50 rounded-lg text-left transition flex flex-col justify-between">
+                                <span class="text-xs font-semibold text-slate-200 group-hover:text-cyan-400 flex items-center justify-between">
+                                    Ping (ICMP Echo)
+                                    <i class="fa-solid fa-terminal text-slate-500 group-hover:text-cyan-400 text-xs"></i>
+                                </span>
+                                <span class="text-[10px] text-slate-400 mt-1">Echo Request & Reply</span>
+                            </button>
+
+                            <button onclick="launchScenario('udp')" class="group p-2.5 bg-slate-800/80 hover:bg-pink-950/40 border border-slate-700/80 hover:border-pink-500/50 rounded-lg text-left transition flex flex-col justify-between">
+                                <span class="text-xs font-semibold text-slate-200 group-hover:text-pink-400 flex items-center justify-between">
+                                    UDP Video Stream
+                                    <i class="fa-solid fa-video text-slate-500 group-hover:text-pink-400 text-xs"></i>
+                                </span>
+                                <span class="text-[10px] text-slate-400 mt-1">Burst Stream (No Handshake)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Custom Packet Builder & Parameters -->
+                    <div class="bg-cyber-card border border-slate-800 rounded-xl p-4 space-y-4">
+                        <h2 class="text-sm font-semibold text-slate-200 flex items-center justify-between">
+                            <span class="flex items-center gap-2"><i class="fa-solid fa-sliders text-cyan-400"></i> Custom Packet Builder & Network Controls</span>
+                            <span class="text-xs font-normal text-slate-400">Manual Injection</span>
+                        </h2>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-400 mb-1">Source Node</label>
+                                <select id="param-src" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+                                    <option value="client">Client PC (192.168.1.105)</option>
+                                    <option value="dns">DNS Server (8.8.8.8)</option>
+                                    <option value="webserver">Web Server (198.51.100.100)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-400 mb-1">Destination Node</label>
+                                <select id="param-dst" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+                                    <option value="webserver">Web Server (198.51.100.100)</option>
+                                    <option value="cdn">CDN Edge Node (104.21.32.1)</option>
+                                    <option value="dns">DNS Server (8.8.8.8)</option>
+                                    <option value="client">Client PC (192.168.1.105)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-400 mb-1">Protocol & Port</label>
+                                <select id="param-proto" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+                                    <option value="HTTP">HTTP (TCP 80)</option>
+                                    <option value="TLS">HTTPS/TLS (TCP 443)</option>
+                                    <option value="DNS">DNS Query (UDP 53)</option>
+                                    <option value="ICMP">ICMP Ping</option>
+                                    <option value="UDP">Raw UDP Stream</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-400 mb-1">Custom Payload Content</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="param-payload" value="GET /api/v1/data HTTP/1.1" placeholder="Enter payload text..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 code-font focus:outline-none focus:border-cyan-500">
+                                <button onclick="sendCustomPacket()" class="px-4 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs rounded-lg transition flex items-center gap-1.5 shadow-lg shadow-cyan-500/20">
+                                    <i class="fa-solid fa-paper-plane"></i> Send
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Sliders Section -->
+                        <div class="pt-2 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                                    <span>Packet Loss %</span>
+                                    <span id="val-loss" class="text-cyan-400 font-mono">0%</span>
+                                </div>
+                                <input type="range" id="slider-loss" min="0" max="50" value="0" oninput="updateParameters()" class="w-full accent-cyan-400 bg-slate-800 rounded">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                                    <span>Base Latency</span>
+                                    <span id="val-latency" class="text-cyan-400 font-mono">30ms</span>
+                                </div>
+                                <input type="range" id="slider-latency" min="10" max="300" value="30" oninput="updateParameters()" class="w-full accent-cyan-400 bg-slate-800 rounded">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                                    <span>Sim Speed</span>
+                                    <span id="val-speed" class="text-cyan-400 font-mono">1.0x</span>
+                                </div>
+                                <input type="range" id="slider-speed" min="0.2" max="3" step="0.1" value="1.0" oninput="updateParameters()" class="w-full accent-cyan-400 bg-slate-800 rounded">
+                            </div>
+                        </div>
+
+                        <!-- Network Injections / Disruptions -->
+                        <div class="pt-2 border-t border-slate-800 flex flex-wrap items-center gap-2">
+                            <span class="text-[11px] font-semibold text-slate-400 mr-2">Network Events:</span>
+                            
+                            <button id="btn-toggle-fw" onclick="toggleNetworkEvent('firewall')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-shield-halved text-rose-400"></i>
+                                <span id="label-fw">Block HTTP @ Firewall</span>
+                            </button>
+
+                            <button id="btn-toggle-server" onclick="toggleNetworkEvent('serverDown')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-server text-amber-400"></i>
+                                <span id="label-server">Simulate Web Server Down</span>
+                            </button>
+
+                            <button id="btn-toggle-congestion" onclick="toggleNetworkEvent('congestion')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-traffic-light text-purple-400"></i>
+                                <span id="label-congestion">ISP Node Congestion</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right 5 Cols: Live Packet Header & OSI Inspector Panel -->
+                <div class="lg:col-span-5 space-y-5">
+                    
+                    <div class="bg-cyber-card border border-slate-800 rounded-xl p-4 space-y-3 h-full flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                                <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                                    <i class="fa-solid fa-microscope text-cyan-400"></i> Packet Header Inspector
+                                </h2>
+                                <span id="inspector-status" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">Awaiting Packet</span>
+                            </div>
+
+                            <!-- Live Encapsulation Stack Breakdown -->
+                            <div class="mt-3 space-y-2">
+                                <!-- Layer 7: Application -->
+                                <div class="bg-emerald-950/20 border border-emerald-500/30 rounded-lg p-2.5 text-xs space-y-1">
+                                    <div class="flex items-center justify-between font-semibold text-emerald-400 text-[11px]">
+                                        <span>L7 • Application Layer</span>
+                                        <span id="inspect-l7-proto" class="font-mono text-[10px] bg-emerald-900/40 px-1.5 py-0.5 rounded">HTTP / App</span>
+                                    </div>
+                                    <div id="inspect-l7-data" class="text-slate-300 code-font text-[11px] truncate">
+                                        Payload: Ready to capture...
+                                    </div>
+                                </div>
+
+                                <!-- Layer 4: Transport -->
+                                <div class="bg-blue-950/20 border border-blue-500/30 rounded-lg p-2.5 text-xs space-y-1">
+                                    <div class="flex items-center justify-between font-semibold text-blue-400 text-[11px]">
+                                        <span>L4 • Transport Layer</span>
+                                        <span id="inspect-l4-proto" class="font-mono text-[10px] bg-blue-900/40 px-1.5 py-0.5 rounded">TCP / UDP</span>
+                                    </div>
+                                    <div id="inspect-l4-data" class="text-slate-300 code-font text-[11px] grid grid-cols-2 gap-1">
+                                        <span>Src Port: --</span>
+                                        <span>Dst Port: --</span>
+                                        <span>Flags: --</span>
+                                        <span>Seq: --</span>
+                                    </div>
+                                </div>
+
+                                <!-- Layer 3: Network -->
+                                <div class="bg-amber-950/20 border border-amber-500/30 rounded-lg p-2.5 text-xs space-y-1">
+                                    <div class="flex items-center justify-between font-semibold text-amber-400 text-[11px]">
+                                        <span>L3 • Network Layer</span>
+                                        <span id="inspect-l3-proto" class="font-mono text-[10px] bg-amber-900/40 px-1.5 py-0.5 rounded">IPv4</span>
+                                    </div>
+                                    <div id="inspect-l3-data" class="text-slate-300 code-font text-[11px] grid grid-cols-2 gap-1">
+                                        <span>Src IP: 0.0.0.0</span>
+                                        <span>Dst IP: 0.0.0.0</span>
+                                        <span>TTL: 64</span>
+                                        <span>Protocol ID: --</span>
+                                    </div>
+                                </div>
+
+                                <!-- Layer 2: Data Link -->
+                                <div class="bg-purple-950/20 border border-purple-500/30 rounded-lg p-2.5 text-xs space-y-1">
+                                    <div class="flex items-center justify-between font-semibold text-purple-400 text-[11px]">
+                                        <span>L2 • Data Link Layer</span>
+                                        <span id="inspect-l2-proto" class="font-mono text-[10px] bg-purple-900/40 px-1.5 py-0.5 rounded">Ethernet II</span>
+                                    </div>
+                                    <div id="inspect-l2-data" class="text-slate-300 code-font text-[11px] grid grid-cols-2 gap-1">
+                                        <span class="truncate">Src MAC: --</span>
+                                        <span class="truncate">Dst MAC: --</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Selected Node Details Card -->
+                        <div class="mt-4 pt-3 border-t border-slate-800 bg-slate-900/60 rounded-lg p-3 text-xs space-y-1.5">
+                            <div class="flex items-center justify-between font-semibold text-slate-200">
+                                <span class="flex items-center gap-1.5" id="inspect-node-title">
+                                    <i class="fa-solid fa-circle-info text-cyan-400"></i> Selected Node: Client PC
+                                </span>
+                                <span id="inspect-node-status" class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-500/30">ONLINE</span>
+                            </div>
+                            <div class="text-slate-400 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] font-mono">
+                                <div>IP: <span id="inspect-node-ip" class="text-slate-200">192.168.1.105</span></div>
+                                <div>MAC: <span id="inspect-node-mac" class="text-slate-200">00:1A:2B:3C:4D:5E</span></div>
+                                <div>Role: <span id="inspect-node-role" class="text-slate-200">End Host Device</span></div>
+                                <div>Buffer: <span id="inspect-node-buffer" class="text-slate-200">0 Packets</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Bottom Live Wireshark Mini-Log Table -->
+            <div class="bg-cyber-card border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                <div class="bg-slate-900/90 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between text-xs">
+                    <span class="font-semibold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-cyan-400"></i> Real-time Packet Capture Stream
+                    </span>
+                    <button onclick="switchView('wireshark')" class="text-cyan-400 hover:text-cyan-300 font-medium flex items-center gap-1">
+                        Open Full Capture View <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                    </button>
+                </div>
+                <div class="overflow-x-auto max-h-48">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-slate-900/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800 sticky top-0">
+                            <tr>
+                                <th class="p-2 pl-4">No.</th>
+                                <th class="p-2">Time</th>
+                                <th class="p-2">Source</th>
+                                <th class="p-2">Destination</th>
+                                <th class="p-2">Protocol</th>
+                                <th class="p-2">Length</th>
+                                <th class="p-2">Info / Payload Preview</th>
+                                <th class="p-2 pr-4 text-right">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mini-log-table-body" class="divide-y divide-slate-800/60 text-slate-300">
+                            <!-- Rows populated via JS -->
+                            <tr>
+                                <td colspan="8" class="text-center py-6 text-slate-500 italic font-sans text-xs">No packets transmitted yet. Launch a preset scenario above!</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- VIEW 2: OSI & ENCAPSULATION BREAKDOWN -->
+        <section id="view-osi" class="hidden space-y-6">
+            <div class="bg-cyber-card border border-slate-800 rounded-2xl p-6 space-y-6">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-layer-group text-cyan-400"></i> Interactive OSI Layer & Packet Encapsulation Model
+                    </h2>
+                    <p class="text-sm text-slate-400 mt-1">
+                        Understand how user data gets wrapped in headers at each network layer (Encapsulation) on transmission, and stripped off (Decapsulation) upon reception.
+                    </p>
+                </div>
+
+                <!-- Step Interactive Encapsulation Visualizer -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    <!-- Left Column: Interactive Layer Cards Stack -->
+                    <div class="space-y-3">
+                        <div onclick="selectOsiLayer(7)" id="osi-card-7" class="osi-layer-card cursor-pointer bg-slate-900 border border-emerald-500/50 hover:border-emerald-400 rounded-xl p-4 transition shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-emerald-400 text-sm">Layer 7 • Application Layer</span>
+                                <span class="text-xs font-mono text-slate-400">HTTP, DNS, TLS, SSH</span>
+                            </div>
+                            <p class="text-xs text-slate-300 mt-1">Generates raw data payload (e.g., HTTP GET string or DNS hostname request).</p>
+                        </div>
+
+                        <div onclick="selectOsiLayer(4)" id="osi-card-4" class="osi-layer-card cursor-pointer bg-slate-900 border border-blue-500/30 hover:border-blue-400 rounded-xl p-4 transition">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-blue-400 text-sm">Layer 4 • Transport Layer</span>
+                                <span class="text-xs font-mono text-slate-400">TCP / UDP</span>
+                            </div>
+                            <p class="text-xs text-slate-300 mt-1">Adds Source/Dest Ports, Sequence Numbers, Flags (SYN/ACK), CRC checksum.</p>
+                        </div>
+
+                        <div onclick="selectOsiLayer(3)" id="osi-card-3" class="osi-layer-card cursor-pointer bg-slate-900 border border-amber-500/30 hover:border-amber-400 rounded-xl p-4 transition">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-amber-400 text-sm">Layer 3 • Network Layer</span>
+                                <span class="text-xs font-mono text-slate-400">IPv4 / IPv6</span>
+                            </div>
+                            <p class="text-xs text-slate-300 mt-1">Adds Source & Destination IP addresses, TTL (Time To Live), Protocol ID.</p>
+                        </div>
+
+                        <div onclick="selectOsiLayer(2)" id="osi-card-2" class="osi-layer-card cursor-pointer bg-slate-900 border border-purple-500/30 hover:border-purple-400 rounded-xl p-4 transition">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-purple-400 text-sm">Layer 2 • Data Link Layer</span>
+                                <span class="text-xs font-mono text-slate-400">Ethernet II / Wi-Fi</span>
+                            </div>
+                            <p class="text-xs text-slate-300 mt-1">Encapsulates in Ethernet frame with Source/Destination MAC physical addresses.</p>
+                        </div>
+
+                        <div onclick="selectOsiLayer(1)" id="osi-card-1" class="osi-layer-card cursor-pointer bg-slate-900 border border-slate-700 hover:border-slate-500 rounded-xl p-4 transition">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-400 text-sm">Layer 1 • Physical Layer</span>
+                                <span class="text-xs font-mono text-slate-400">Copper / Fiber / Radio</span>
+                            </div>
+                            <p class="text-xs text-slate-300 mt-1">Converts frame bytes into electrical pulses, optical signals, or radio waves.</p>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Animated Packet Frame Structure Visualizer -->
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                            <span>Ethernet Frame Structure Preview</span>
+                            <span id="osi-selected-layer-badge" class="text-cyan-400 font-mono">Layer 7 Active</span>
+                        </h3>
+
+                        <!-- Visual Frame Container -->
+                        <div class="space-y-2 font-mono text-xs">
+                            <!-- L2 Header -->
+                            <div class="bg-purple-950/60 border border-purple-500/50 p-2.5 rounded-lg flex items-center justify-between text-purple-300">
+                                <span>[ L2 Header ] MAC: 00:1A:2B.. → 00:11:22..</span>
+                                <span class="text-[10px] bg-purple-900/50 px-1.5 py-0.5 rounded">14 Bytes</span>
+                            </div>
+
+                            <!-- L3 IP Header -->
+                            <div class="bg-amber-950/60 border border-amber-500/50 p-2.5 rounded-lg ml-3 flex items-center justify-between text-amber-300">
+                                <span>[ L3 IP Header ] 192.168.1.105 → 198.51.100.100</span>
+                                <span class="text-[10px] bg-amber-900/50 px-1.5 py-0.5 rounded">20 Bytes</span>
+                            </div>
+
+                            <!-- L4 TCP Header -->
+                            <div class="bg-blue-950/60 border border-blue-500/50 p-2.5 rounded-lg ml-6 flex items-center justify-between text-blue-300">
+                                <span>[ L4 TCP Header ] Port 54120 → Port 80 [SYN]</span>
+                                <span class="text-[10px] bg-blue-900/50 px-1.5 py-0.5 rounded">20 Bytes</span>
+                            </div>
+
+                            <!-- L7 Data Payload -->
+                            <div class="bg-emerald-950/80 border border-emerald-500/80 p-3 rounded-lg ml-9 text-emerald-200">
+                                <div class="font-bold text-[11px] mb-1">Payload (Data)</div>
+                                <div class="text-[11px] code-font bg-slate-900/80 p-2 rounded text-emerald-400 break-all">
+                                    GET /index.html HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Mozilla/5.0...
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="osi-explanation-box" class="bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-slate-300 space-y-1">
+                            <span class="font-bold text-cyan-400">Encapsulation Insight:</span>
+                            <p>As packet moves down the OSI stack, each layer prepends its own control header containing addressing and routing rules.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW 3: LIVE WIRESHARK PACKET CAPTURE VIEW -->
+        <section id="view-wireshark" class="hidden space-y-4">
+            <div class="bg-cyber-card border border-slate-800 rounded-2xl p-5 space-y-4 shadow-2xl">
+                
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-network-wired text-cyan-400"></i> Live Packet Capture Log (Wireshark Interface)
+                        </h2>
+                        <p class="text-xs text-slate-400">Filter, inspect, and analyze network frame packets in real-time.</p>
+                    </div>
+
+                    <!-- Search and Filter Bar -->
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <select id="wireshark-filter-proto" onchange="applyWiresharkFilters()" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-500">
+                            <option value="ALL">All Protocols</option>
+                            <option value="HTTP">HTTP</option>
+                            <option value="TLS">TLS</option>
+                            <option value="DNS">DNS</option>
+                            <option value="TCP">TCP</option>
+                            <option value="ICMP">ICMP</option>
+                            <option value="UDP">UDP</option>
+                        </select>
+
+                        <button onclick="exportPacketLogs()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs text-slate-200 flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-download"></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Full Packet Log Table -->
+                <div class="border border-slate-800 rounded-xl overflow-hidden bg-slate-950">
+                    <div class="overflow-x-auto max-h-[480px]">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead class="bg-slate-900 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800 sticky top-0 z-10">
+                                <tr>
+                                    <th class="p-2.5 pl-4">Frame #</th>
+                                    <th class="p-2.5">Time (s)</th>
+                                    <th class="p-2.5">Source IP</th>
+                                    <th class="p-2.5">Destination IP</th>
+                                    <th class="p-2.5">Protocol</th>
+                                    <th class="p-2.5">Length</th>
+                                    <th class="p-2.5">Info Header Details</th>
+                                    <th class="p-2.5 pr-4 text-right">Delivery Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="full-log-table-body" class="divide-y divide-slate-800/60 text-slate-300">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- VIEW 4: EDUCATIONAL GUIDE -->
+        <section id="view-guide" class="hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <!-- Card 1: TCP vs UDP -->
+                <div class="bg-cyber-card border border-slate-800 rounded-2xl p-5 space-y-3">
+                    <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 text-lg font-bold">
+                        <i class="fa-solid fa-arrows-split-up-and-left"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-white">TCP vs UDP Protocols</h3>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        <strong class="text-blue-400">TCP (Transmission Control Protocol)</strong> is connection-oriented, reliable, and guarantees in-order delivery via handshakes (SYN, SYN-ACK, ACK) and retransmissions. Used for Web (HTTP), Email, SSH.
+                    </p>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        <strong class="text-pink-400">UDP (User Datagram Protocol)</strong> is connectionless and lightweight. It prioritizes speed over reliability without handshakes or error recovery. Used for Video Streaming, Gaming, DNS.
+                    </p>
+                </div>
+
+                <!-- Card 2: DNS Resolution Workflow -->
+                <div class="bg-cyber-card border border-slate-800 rounded-2xl p-5 space-y-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 text-lg font-bold">
+                        <i class="fa-solid fa-sitemap"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-white">DNS Lookup Architecture</h3>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        Computers communicate via IP addresses (e.g. 198.51.100.100), but humans use domain names (example.com).
+                        The <strong class="text-amber-400">Domain Name System (DNS)</strong> acts as the internet's phonebook, translating human domain names into IP addresses via fast UDP queries.
+                    </p>
+                </div>
+
+                <!-- Card 3: Firewall & Security -->
+                <div class="bg-cyber-card border border-slate-800 rounded-2xl p-5 space-y-3">
+                    <div class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 text-lg font-bold">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-white">Firewalls & Access Control</h3>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        Firewalls examine packet headers (Source/Dest IP, Port numbers, Protocols) against Security ACL rules. If traffic violates policies or targets restricted ports, the packet is instantly dropped or rejected.
+                    </p>
+                </div>
+
+                <!-- Card 4: CDN & Latency Optimization -->
+                <div class="bg-cyber-card border border-slate-800 rounded-2xl p-5 space-y-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-lg font-bold">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-white">Content Delivery Networks (CDN)</h3>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        CDNs place edge server caches geographically closer to users. Instead of routing traffic all the way to an origin web server across the globe, requests are served directly from the nearest CDN node, drastically reducing network latency and round-trip time (RTT).
+                    </p>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER SECTION -->
+    <footer class="bg-slate-900 border-t border-slate-800 mt-auto py-4 px-4 text-slate-400 text-xs">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                <span>TCP/IP Stack Reference • Standards RFC 791 (IP) / RFC 793 (TCP)</span>
+            </div>
+            <div class="text-slate-500 text-center sm:text-right">
+                Built with Vanilla JS & HTML5 Canvas • Interactive Simulator
+            </div>
+        </div>
+    </footer>
+
+    <!-- INTERACTIVE JAVASCRIPT ENGINE -->
+    <script>
+        // =========================================================================
+        // 1. STATE & SIMULATION DATA STRUCTURES
+        // =========================================================================
+
+        const state = {
+            isPaused: false,
+            activeView: 'topology',
+            frameCount: 0,
+            packetCounter: 0,
+            stats: {
+                sent: 0,
+                delivered: 0,
+                dropped: 0,
+                totalLatencyMs: 0,
+            },
+            parameters: {
+                lossRate: 0,      // %
+                latency: 30,      // ms
+                speed: 1.0,       // multiplier
+            },
+            events: {
+                firewallBlock: false,
+                serverDown: false,
+                congestion: false
+            },
+            selectedNodeId: 'client',
+            selectedPacket: null
+        };
+
+        // Network Topology Nodes Configuration
+        const nodes = {
+            client: {
+                id: 'client',
+                name: 'Client PC',
+                type: 'host',
+                ip: '192.168.1.105',
+                mac: '00:1A:2B:3C:4D:5E',
+                role: 'End User Workstation',
+                status: 'online',
+                relX: 0.10, relY: 0.50,
+                icon: 'fa-laptop'
+            },
+            router: {
+                id: 'router',
+                name: 'Home Router',
+                type: 'router',
+                ip: '192.168.1.1 / 73.150.12.1',
+                mac: '00:11:22:33:44:55',
+                role: 'NAT Gateway / Router',
+                status: 'online',
+                relX: 0.26, relY: 0.50,
+                icon: 'fa-box'
+            },
+            isp: {
+                id: 'isp',
+                name: 'ISP Gateway',
+                type: 'gateway',
+                ip: '73.150.0.1',
+                mac: '00:AA:BB:CC:DD:EE',
+                role: 'Internet Service Provider',
+                status: 'online',
+                relX: 0.42, relY: 0.50,
+                icon: 'fa-network-wired'
+            },
+            dns: {
+                id: 'dns',
+                name: 'DNS Server',
+                type: 'server',
+                ip: '8.8.8.8',
+                mac: '00:50:56:11:22:33',
+                role: 'Google Public DNS',
+                status: 'online',
+                relX: 0.42, relY: 0.18,
+                icon: 'fa-magnifying-glass'
+            },
+            firewall: {
+                id: 'firewall',
+                name: 'Firewall / WAF',
+                type: 'security',
+                ip: '198.51.100.1',
+                mac: '00:FE:DC:BA:98:76',
+                role: 'Security Gateway',
+                status: 'online',
+                relX: 0.58, relY: 0.50,
+                icon: 'fa-shield-halved'
+            },
+            loadbalancer: {
+                id: 'loadbalancer',
+                name: 'Load Balancer',
+                type: 'lb',
+                ip: '198.51.100.50',
+                mac: '00:22:44:66:88:AA',
+                role: 'Traffic Distributor',
+                status: 'online',
+                relX: 0.74, relY: 0.50,
+                icon: 'fa-code-branch'
+            },
+            cdn: {
+                id: 'cdn',
+                name: 'CDN Edge Node',
+                type: 'cdn',
+                ip: '104.21.32.1',
+                mac: '00:88:99:AA:BB:CC',
+                role: 'Cloudflare Cache Edge',
+                status: 'online',
+                relX: 0.58, relY: 0.82,
+                icon: 'fa-bolt'
+            },
+            webserver: {
+                id: 'webserver',
+                name: 'Web Server',
+                type: 'server',
+                ip: '198.51.100.100',
+                mac: '00:DE:AD:BE:EF:00',
+                role: 'Origin Server (example.com)',
+                status: 'online',
+                relX: 0.90, relY: 0.50,
+                icon: 'fa-server'
+            }
+        };
+
+        // Static Connection Links between nodes
+        const links = [
+            { from: 'client', to: 'router' },
+            { from: 'router', to: 'isp' },
+            { from: 'isp', to: 'dns' },
+            { from: 'isp', to: 'cdn' },
+            { from: 'isp', to: 'firewall' },
+            { from: 'firewall', to: 'loadbalancer' },
+            { from: 'loadbalancer', to: 'webserver' }
+        ];
+
+        // Active Flying Packets in Transit
+        let activePackets = [];
+
+        // All Logged Packets
+        let packetLogs = [];
+
+        // Dynamic Visual Effects (Drop explosions, particles)
+        let visualEffects = [];
+
+        // Colors per protocol
+        const protocolColors = {
+            HTTP: '#10b981', // green
+            DNS: '#f59e0b',  // amber
+            TCP: '#3b82f6',  // blue
+            TLS: '#a855f7',  // purple
+            ICMP: '#06b6d4', // cyan
+            UDP: '#ec4899'   // pink
+        };
+
+        // =========================================================================
+        // 2. CANVAS ENGINE & RENDERING
+        // =========================================================================
+
+        const canvas = document.getElementById('networkCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        function getNodeCoords(node) {
+            const width = canvas.width / window.devicePixelRatio;
+            const height = canvas.height / window.devicePixelRatio;
+            return {
+                x: node.relX * width,
+                y: node.relY * height
+            };
+        }
+
+        function drawGrid(width, height) {
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.3)';
+            ctx.lineWidth = 1;
+            const gridSize = 30;
+            
+            for (let x = 0; x < width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawLinks() {
+            links.forEach(link => {
+                const nodeA = nodes[link.from];
+                const nodeB = nodes[link.to];
+                if (!nodeA || !nodeB) return;
+
+                const posA = getNodeCoords(nodeA);
+                const posB = getNodeCoords(nodeB);
+
+                // Line path glow
+                ctx.beginPath();
+                ctx.moveTo(posA.x, posA.y);
+                ctx.lineTo(posB.x, posB.y);
+
+                const isCongested = state.events.congestion && (link.from === 'router' || link.to === 'isp');
+                ctx.strokeStyle = isCongested ? 'rgba(245, 158, 11, 0.6)' : 'rgba(51, 65, 85, 0.7)';
+                ctx.lineWidth = isCongested ? 3 : 2;
+                if (isCongested) ctx.setLineDash([6, 6]);
+                else ctx.setLineDash([]);
+                
+                ctx.stroke();
+                ctx.setLineDash([]);
+            });
+        }
+
+        function drawNodes() {
+            const width = canvas.width / window.devicePixelRatio;
+            const height = canvas.height / window.devicePixelRatio;
+
+            Object.values(nodes).forEach(node => {
+                const pos = getNodeCoords(node);
+                const isSelected = state.selectedNodeId === node.id;
+
+                // Status colors
+                let statusColor = '#10b981'; // Green (Online)
+                if (node.status === 'blocked') statusColor = '#ef4444'; // Red
+                else if (node.status === 'offline') statusColor = '#64748b'; // Gray
+                else if (node.status === 'congested') statusColor = '#f59e0b'; // Amber
+
+                // Draw pulsing outer glow if selected
+                if (isSelected) {
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, 28, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0, 242, 254, 0.15)';
+                    ctx.fill();
+                    ctx.strokeStyle = '#00f2fe';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                // Node circle background
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 20, 0, Math.PI * 2);
+                ctx.fillStyle = '#121824';
+                ctx.fill();
+                ctx.strokeStyle = isSelected ? '#00f2fe' : '#334155';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Inner status dot
+                ctx.beginPath();
+                ctx.arc(pos.x + 14, pos.y - 14, 5, 0, Math.PI * 2);
+                ctx.fillStyle = statusColor;
+                ctx.fill();
+
+                // Draw Label & IP
+                ctx.fillStyle = isSelected ? '#00f2fe' : '#e2e8f0';
+                ctx.font = '600 11px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(node.name, pos.x, pos.y + 34);
+
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '400 9px "JetBrains Mono", monospace';
+                ctx.fillText(node.ip, pos.x, pos.y + 46);
+            });
+        }
+
+        function drawPackets() {
+            activePackets.forEach(pkt => {
+                if (pkt.path.length < 2) return;
+
+                const currNode = nodes[pkt.path[pkt.currentHopIndex]];
+                const nextNode = nodes[pkt.path[pkt.currentHopIndex + 1]];
+                if (!currNode || !nextNode) return;
+
+                const startPos = getNodeCoords(currNode);
+                const endPos = getNodeCoords(nextNode);
+
+                // Interpolate linear position along segment
+                const x = startPos.x + (endPos.x - startPos.x) * pkt.progress;
+                const y = startPos.y + (endPos.y - startPos.y) * pkt.progress;
+
+                // Save trail positions
+                pkt.trail.push({ x, y });
+                if (pkt.trail.length > 8) pkt.trail.shift();
+
+                // Draw glowing packet trail
+                for (let i = 0; i < pkt.trail.length; i++) {
+                    const pt = pkt.trail[i];
+                    const alpha = (i + 1) / pkt.trail.length;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, 4 * alpha, 0, Math.PI * 2);
+                    ctx.fillStyle = pkt.color;
+                    ctx.globalAlpha = alpha * 0.6;
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                }
+
+                // Main Packet Orb
+                ctx.beginPath();
+                ctx.arc(x, y, 7, 0, Math.PI * 2);
+                ctx.fillStyle = pkt.color;
+                ctx.shadowColor = pkt.color;
+                ctx.shadowBlur = 12;
+                ctx.fill();
+                ctx.shadowBlur = 0; // reset glow
+
+                // Inner Core
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+            });
+        }
+
+        function drawVisualEffects() {
+            for (let i = visualEffects.length - 1; i >= 0; i--) {
+                const fx = visualEffects[i];
+                fx.radius += 1.2;
+                fx.alpha -= 0.04;
+
+                if (fx.alpha <= 0) {
+                    visualEffects.splice(i, 1);
+                    continue;
+                }
+
+                ctx.beginPath();
+                ctx.arc(fx.x, fx.y, fx.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = fx.color;
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = fx.alpha;
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        function renderLoop() {
+            const width = canvas.width / window.devicePixelRatio;
+            const height = canvas.height / window.devicePixelRatio;
+
+            ctx.clearRect(0, 0, width, height);
+
+            drawGrid(width, height);
+            drawLinks();
+            drawNodes();
+            if (!state.isPaused) {
+                updatePackets();
+            }
+            drawPackets();
+            drawVisualEffects();
+
+            state.frameCount++;
+            requestAnimationFrame(renderLoop);
+        }
+
+        // =========================================================================
+        // 3. PACKET ROUTING & SIMULATION ENGINE
+        // =========================================================================
+
+        function createPacket(options) {
+            state.packetCounter++;
+            const protocol = options.protocol || 'HTTP';
+            const color = protocolColors[protocol] || '#00f2fe';
+
+            const pkt = {
+                id: state.packetCounter,
+                time: (performance.now() / 1000).toFixed(3),
+                srcId: options.srcId,
+                dstId: options.dstId,
+                path: options.path,
+                currentHopIndex: 0,
+                progress: 0,
+                speed: (0.015 * state.parameters.speed) / (state.events.congestion ? 2 : 1),
+                protocol: protocol,
+                color: color,
+                payload: options.payload || 'GET / HTTP/1.1',
+                length: (options.payload ? options.payload.length + 54 : 64) + ' Bytes',
+                trail: [],
+                status: 'In Transit',
+                headers: generatePacketHeaders(options)
+            };
+
+            state.stats.sent++;
+            updateStatsUI();
+            activePackets.push(pkt);
+
+            // Set Inspector to latest created packet
+            inspectPacket(pkt);
+        }
+
+        function generatePacketHeaders(opt) {
+            const srcNode = nodes[opt.srcId] || nodes.client;
+            const dstNode = nodes[opt.dstId] || nodes.webserver;
+
+            return {
+                l7: {
+                    proto: opt.protocol,
+                    data: opt.payload || 'Data Payload'
+                },
+                l4: {
+                    proto: opt.protocol === 'DNS' || opt.protocol === 'UDP' ? 'UDP' : 'TCP',
+                    srcPort: Math.floor(49152 + Math.random() * 10000),
+                    dstPort: opt.protocol === 'HTTP' ? 80 : opt.protocol === 'TLS' ? 443 : opt.protocol === 'DNS' ? 53 : 8080,
+                    flags: opt.flags || '[ACK, PSH]',
+                    seq: Math.floor(Math.random() * 100000)
+                },
+                l3: {
+                    proto: 'IPv4',
+                    srcIp: srcNode.ip.split(' ')[0],
+                    dstIp: dstNode.ip.split(' ')[0],
+                    ttl: 64,
+                    protocolId: opt.protocol === 'UDP' || opt.protocol === 'DNS' ? 17 : 6
+                },
+                l2: {
+                    proto: 'Ethernet II',
+                    srcMac: srcNode.mac,
+                    dstMac: '00:11:22:33:44:55'
+                }
+            };
+        }
+
+        function updatePackets() {
+            for (let i = activePackets.length - 1; i >= 0; i--) {
+                const pkt = activePackets[i];
+                pkt.progress += pkt.speed;
+
+                if (pkt.progress >= 1.0) {
+                    pkt.progress = 0;
+                    pkt.currentHopIndex++;
+
+                    const currentNodeId = pkt.path[pkt.currentHopIndex];
+                    const currNode = nodes[currentNodeId];
+
+                    // Check for Drop / Firewall / Server Down events
+                    let isDropped = false;
+                    let dropReason = '';
+
+                    // 1. Simulated Packet Loss slider check
+                    if (Math.random() * 100 < state.parameters.lossRate) {
+                        isDropped = true;
+                        dropReason = 'Dropped (Random Packet Loss)';
+                    }
+                    // 2. Firewall Blocking Event
+                    else if (state.events.firewallBlock && currentNodeId === 'firewall' && pkt.protocol === 'HTTP') {
+                        isDropped = true;
+                        dropReason = 'Blocked by Firewall ACL';
+                        nodes.firewall.status = 'blocked';
+                    }
+                    // 3. Web Server Down Event
+                    else if (state.events.serverDown && currentNodeId === 'webserver') {
+                        isDropped = true;
+                        dropReason = 'Rejected (Server Down)';
+                        nodes.webserver.status = 'offline';
+                    }
+
+                    if (isDropped) {
+                        pkt.status = dropReason;
+                        state.stats.dropped++;
+                        
+                        // Add visual drop ring effect
+                        const pos = getNodeCoords(currNode || nodes[pkt.srcId]);
+                        visualEffects.push({
+                            x: pos.x, y: pos.y, radius: 10, alpha: 1.0, color: '#ef4444'
+                        });
+
+                        logPacketRecord(pkt, 'Dropped');
+                        activePackets.splice(i, 1);
+                        updateStatsUI();
+                        continue;
+                    }
+
+                    // Check if packet reached final destination
+                    if (pkt.currentHopIndex >= pkt.path.length - 1) {
+                        pkt.status = 'Delivered';
+                        state.stats.delivered++;
+                        state.stats.totalLatencyMs += parseInt(state.parameters.latency);
+
+                        const pos = getNodeCoords(nodes[pkt.dstId]);
+                        visualEffects.push({
+                            x: pos.x, y: pos.y, radius: 10, alpha: 1.0, color: '#10b981'
+                        });
+
+                        logPacketRecord(pkt, 'Delivered');
+                        activePackets.splice(i, 1);
+                        updateStatsUI();
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // Dynamic Route Resolution Path Builder
+        function resolvePath(srcId, dstId, protocol) {
+            if (srcId === dstId) return [srcId];
+
+            if (protocol === 'DNS' || dstId === 'dns') {
+                return ['client', 'router', 'isp', 'dns'];
+            }
+            if (dstId === 'cdn') {
+                return ['client', 'router', 'isp', 'cdn'];
+            }
+            if (dstId === 'webserver' || dstId === 'loadbalancer') {
+                return ['client', 'router', 'isp', 'firewall', 'loadbalancer', 'webserver'];
+            }
+
+            // Default fallback path
+            return [srcId, 'router', 'isp', dstId];
+        }
+
+        // =========================================================================
+        // 4. PRESET TRAFFIC SCENARIOS
+        // =========================================================================
+
+        function launchScenario(type) {
+            if (state.isPaused) togglePauseSimulation();
+
+            if (type === 'http') {
+                const path = resolvePath('client', 'webserver', 'HTTP');
+                createPacket({
+                    srcId: 'client', dstId: 'webserver',
+                    path: path, protocol: 'HTTP',
+                    payload: 'GET /index.html HTTP/1.1\r\nHost: example.com'
+                });
+            }
+            else if (type === 'dns') {
+                const path = resolvePath('client', 'dns', 'DNS');
+                createPacket({
+                    srcId: 'client', dstId: 'dns',
+                    path: path, protocol: 'DNS',
+                    payload: 'Standard Query A example.com'
+                });
+            }
+            else if (type === 'tcp') {
+                // Sequence of 3-Way Handshake
+                const pathForward = resolvePath('client', 'webserver', 'TCP');
+                const pathReturn = [...pathForward].reverse();
+
+                // Step 1: SYN
+                createPacket({
+                    srcId: 'client', dstId: 'webserver',
+                    path: pathForward, protocol: 'TCP',
+                    flags: '[SYN]', payload: 'TCP SYN Seq=0 Win=65535'
+                });
+
+                // Step 2: SYN-ACK delayed
+                setTimeout(() => {
+                    createPacket({
+                        srcId: 'webserver', dstId: 'client',
+                        path: pathReturn, protocol: 'TCP',
+                        flags: '[SYN, ACK]', payload: 'TCP SYN-ACK Seq=0 Ack=1'
+                    });
+                }, 1200 / state.parameters.speed);
+
+                // Step 3: ACK
+                setTimeout(() => {
+                    createPacket({
+                        srcId: 'client', dstId: 'webserver',
+                        path: pathForward, protocol: 'TCP',
+                        flags: '[ACK]', payload: 'TCP ACK Seq=1 Ack=1'
+                    });
+                }, 2400 / state.parameters.speed);
+            }
+            else if (type === 'tls') {
+                const path = resolvePath('client', 'webserver', 'TLS');
+                createPacket({
+                    srcId: 'client', dstId: 'webserver',
+                    path: path, protocol: 'TLS',
+                    payload: 'Client Hello (TLS 1.3 Cipher Suites)'
+                });
+            }
+            else if (type === 'icmp') {
+                const pathForward = resolvePath('client', 'webserver', 'ICMP');
+                const pathReturn = [...pathForward].reverse();
+
+                createPacket({
+                    srcId: 'client', dstId: 'webserver',
+                    path: pathForward, protocol: 'ICMP',
+                    payload: 'Echo (ping) request id=0x0001 seq=1'
+                });
+
+                setTimeout(() => {
+                    createPacket({
+                        srcId: 'webserver', dstId: 'client',
+                        path: pathReturn, protocol: 'ICMP',
+                        payload: 'Echo (ping) reply id=0x0001 seq=1'
+                    });
+                }, 1100 / state.parameters.speed);
+            }
+            else if (type === 'udp') {
+                const path = resolvePath('client', 'cdn', 'UDP');
+                for (let i = 0; i < 5; i++) {
+                    setTimeout(() => {
+                        createPacket({
+                            srcId: 'client', dstId: 'cdn',
+                            path: path, protocol: 'UDP',
+                            payload: `UDP Media Stream Chunk #${i + 1}`
+                        });
+                    }, i * 250 / state.parameters.speed);
+                }
+            }
+        }
+
+        function sendCustomPacket() {
+            const srcId = document.getElementById('param-src').value;
+            const dstId = document.getElementById('param-dst').value;
+            const protocol = document.getElementById('param-proto').value;
+            const payload = document.getElementById('param-payload').value;
+
+            const path = resolvePath(srcId, dstId, protocol);
+            createPacket({
+                srcId: srcId,
+                dstId: dstId,
+                path: path,
+                protocol: protocol,
+                payload: payload || 'Custom Frame Payload'
+            });
+        }
+
+        // =========================================================================
+        // 5. INSPECTOR & LOGGING HANDLERS
+        // =========================================================================
+
+        function inspectPacket(pkt) {
+            state.selectedPacket = pkt;
+            const h = pkt.headers;
+
+            document.getElementById('inspector-status').innerText = `Frame #${pkt.id} [${pkt.protocol}]`;
+            
+            // L7
+            document.getElementById('inspect-l7-proto').innerText = h.l7.proto;
+            document.getElementById('inspect-l7-data').innerText = `Payload: ${h.l7.data}`;
+
+            // L4
+            document.getElementById('inspect-l4-proto').innerText = h.l4.proto;
+            document.getElementById('inspect-l4-data').innerHTML = `
+                <span>Src Port: ${h.l4.srcPort}</span>
+                <span>Dst Port: ${h.l4.dstPort}</span>
+                <span>Flags: ${h.l4.flags}</span>
+                <span>Seq: ${h.l4.seq}</span>
+            `;
+
+            // L3
+            document.getElementById('inspect-l3-proto').innerText = h.l3.proto;
+            document.getElementById('inspect-l3-data').innerHTML = `
+                <span>Src IP: ${h.l3.srcIp}</span>
+                <span>Dst IP: ${h.l3.dstIp}</span>
+                <span>TTL: ${h.l3.ttl}</span>
+                <span>Proto ID: ${h.l3.protocolId}</span>
+            `;
+
+            // L2
+            document.getElementById('inspect-l2-proto').innerText = h.l2.proto;
+            document.getElementById('inspect-l2-data').innerHTML = `
+                <span class="truncate">Src MAC: ${h.l2.srcMac}</span>
+                <span class="truncate">Dst MAC: ${h.l2.dstMac}</span>
+            `;
+        }
+
+        function selectNode(nodeId) {
+            const node = nodes[nodeId];
+            if (!node) return;
+
+            state.selectedNodeId = nodeId;
+            document.getElementById('inspect-node-title').innerHTML = `<i class="fa-solid fa-circle-info text-cyan-400"></i> Selected: ${node.name}`;
+            document.getElementById('inspect-node-status').innerText = node.status.toUpperCase();
+            document.getElementById('inspect-node-ip').innerText = node.ip;
+            document.getElementById('inspect-node-mac').innerText = node.mac;
+            document.getElementById('inspect-node-role').innerText = node.role;
+            
+            // Count active buffer packets targeting this node
+            const bufferCount = activePackets.filter(p => p.dstId === nodeId).length;
+            document.getElementById('inspect-node-buffer').innerText = `${bufferCount} Packets`;
+        }
+
+        function logPacketRecord(pkt, status) {
+            const record = {
+                no: pkt.id,
+                time: pkt.time,
+                srcIp: pkt.headers.l3.srcIp,
+                dstIp: pkt.headers.l3.dstIp,
+                protocol: pkt.protocol,
+                length: pkt.length,
+                info: pkt.payload,
+                status: status
+            };
+
+            packetLogs.unshift(record); // newest first
+            renderLogTables();
+        }
+
+        function renderLogTables() {
+            // Render Mini Log Table (Top 5 items)
+            const miniBody = document.getElementById('mini-log-table-body');
+            const recentLogs = packetLogs.slice(0, 5);
+
+            if (recentLogs.length === 0) {
+                miniBody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 italic font-sans text-xs">No packets captured yet.</td></tr>`;
+            } else {
+                miniBody.innerHTML = recentLogs.map(r => `
+                    <tr class="hover:bg-slate-800/50 transition">
+                        <td class="p-2 pl-4 text-slate-400">${r.no}</td>
+                        <td class="p-2 text-slate-400">${r.time}</td>
+                        <td class="p-2 text-slate-200">${r.srcIp}</td>
+                        <td class="p-2 text-slate-200">${r.dstIp}</td>
+                        <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold" style="background:${protocolColors[r.protocol]}20; color:${protocolColors[r.protocol]}">${r.protocol}</span></td>
+                        <td class="p-2 text-slate-400">${r.length}</td>
+                        <td class="p-2 text-slate-300 truncate max-w-xs">${r.info}</td>
+                        <td class="p-2 pr-4 text-right font-bold ${r.status === 'Delivered' ? 'text-emerald-400' : 'text-rose-400'}">${r.status}</td>
+                    </tr>
+                `).join('');
+            }
+
+            // Render Full Wireshark View Table
+            renderWiresharkTable();
+        }
+
+        function renderWiresharkTable() {
+            const fullBody = document.getElementById('full-log-table-body');
+            const filterProto = document.getElementById('wireshark-filter-proto').value;
+
+            const filteredLogs = packetLogs.filter(r => filterProto === 'ALL' || r.protocol === filterProto);
+
+            if (filteredLogs.length === 0) {
+                fullBody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-500 italic font-sans text-xs">No matching packet capture logs found.</td></tr>`;
+            } else {
+                fullBody.innerHTML = filteredLogs.map(r => `
+                    <tr class="hover:bg-slate-800/60 transition">
+                        <td class="p-2.5 pl-4 text-slate-400">${r.no}</td>
+                        <td class="p-2.5 text-slate-400">${r.time}</td>
+                        <td class="p-2.5 text-cyan-300">${r.srcIp}</td>
+                        <td class="p-2.5 text-cyan-300">${r.dstIp}</td>
+                        <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold" style="background:${protocolColors[r.protocol]}25; color:${protocolColors[r.protocol]}">${r.protocol}</span></td>
+                        <td class="p-2.5 text-slate-400">${r.length}</td>
+                        <td class="p-2.5 text-slate-200 font-mono text-[11px] truncate max-w-md">${r.info}</td>
+                        <td class="p-2.5 pr-4 text-right font-bold ${r.status === 'Delivered' ? 'text-emerald-400' : 'text-rose-400'}">${r.status}</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        function applyWiresharkFilters() {
+            renderWiresharkTable();
+        }
+
+        function exportPacketLogs() {
+            if (packetLogs.length === 0) {
+                alert("No packet logs available to export.");
+                return;
+            }
+            let csv = "Frame,Time,Source,Destination,Protocol,Length,Info,Status\n";
+            packetLogs.forEach(r => {
+                csv += `"${r.no}","${r.time}","${r.srcIp}","${r.dstIp}","${r.protocol}","${r.length}","${r.info.replace(/"/g, '""')}","${r.status}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `packet_capture_${Date.now()}.csv`);
+            a.click();
+        }
+
+        // =========================================================================
+        // 6. UI CONTROLS & EVENT LISTENERS
+        // =========================================================================
+
+        function switchView(viewName) {
+            state.activeView = viewName;
+
+            // Toggle Tabs UI
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('text-cyan-400', 'bg-cyan-950/40', 'border', 'border-cyan-500/30');
+                tab.classList.add('text-slate-400');
+            });
+
+            const activeTab = document.getElementById(`tab-${viewName}`);
+            if (activeTab) {
+                activeTab.classList.remove('text-slate-400');
+                activeTab.classList.add('text-cyan-400', 'bg-cyan-950/40', 'border', 'border-cyan-500/30');
+            }
+
+            // Hide/Show Sections
+            document.getElementById('view-topology').classList.add('hidden');
+            document.getElementById('view-osi').classList.add('hidden');
+            document.getElementById('view-wireshark').classList.add('hidden');
+            document.getElementById('view-guide').classList.add('hidden');
+
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+
+            if (viewName === 'topology') {
+                resizeCanvas();
+            }
+        }
+
+        function updateParameters() {
+            state.parameters.lossRate = parseInt(document.getElementById('slider-loss').value);
+            state.parameters.latency = parseInt(document.getElementById('slider-latency').value);
+            state.parameters.speed = parseFloat(document.getElementById('slider-speed').value);
+
+            document.getElementById('val-loss').innerText = `${state.parameters.lossRate}%`;
+            document.getElementById('val-latency').innerText = `${state.parameters.latency}ms`;
+            document.getElementById('val-speed').innerText = `${state.parameters.speed.toFixed(1)}x`;
+        }
+
+        function toggleNetworkEvent(evt) {
+            if (evt === 'firewall') {
+                state.events.firewallBlock = !state.events.firewallBlock;
+                nodes.firewall.status = state.events.firewallBlock ? 'blocked' : 'online';
+                document.getElementById('label-fw').innerText = state.events.firewallBlock ? 'Unblock Firewall' : 'Block HTTP @ Firewall';
+                document.getElementById('btn-toggle-fw').classList.toggle('bg-rose-950/50');
+            }
+            else if (evt === 'serverDown') {
+                state.events.serverDown = !state.events.serverDown;
+                nodes.webserver.status = state.events.serverDown ? 'offline' : 'online';
+                document.getElementById('label-server').innerText = state.events.serverDown ? 'Restore Web Server' : 'Simulate Web Server Down';
+                document.getElementById('btn-toggle-server').classList.toggle('bg-amber-950/50');
+            }
+            else if (evt === 'congestion') {
+                state.events.congestion = !state.events.congestion;
+                nodes.isp.status = state.events.congestion ? 'congested' : 'online';
+                document.getElementById('label-congestion').innerText = state.events.congestion ? 'Clear ISP Congestion' : 'ISP Node Congestion';
+                document.getElementById('btn-toggle-congestion').classList.toggle('bg-purple-950/50');
+            }
+        }
+
+        function togglePauseSimulation() {
+            state.isPaused = !state.isPaused;
+            document.getElementById('label-pause').innerText = state.isPaused ? 'Resume' : 'Pause';
+            document.getElementById('icon-pause').className = state.isPaused ? 'fa-solid fa-play' : 'fa-solid fa-pause';
+        }
+
+        function clearSimulationStats() {
+            state.stats.sent = 0;
+            state.stats.delivered = 0;
+            state.stats.dropped = 0;
+            state.stats.totalLatencyMs = 0;
+            activePackets = [];
+            packetLogs = [];
+            updateStatsUI();
+            renderLogTables();
+        }
+
+        function updateStatsUI() {
+            document.getElementById('stat-sent').innerText = state.stats.sent;
+            document.getElementById('stat-delivered').innerText = state.stats.delivered;
+            document.getElementById('stat-dropped').innerText = state.stats.dropped;
+
+            const avgLat = state.stats.delivered > 0 ? Math.round(state.stats.totalLatencyMs / state.stats.delivered) : 0;
+            document.getElementById('stat-latency').innerText = `${avgLat}ms`;
+        }
+
+        function selectOsiLayer(layerNum) {
+            const badge = document.getElementById('osi-selected-layer-badge');
+            const box = document.getElementById('osi-explanation-box');
+
+            document.querySelectorAll('.osi-layer-card').forEach(c => c.classList.remove('bg-slate-800', 'border-cyan-400'));
+
+            const card = document.getElementById(`osi-card-${layerNum}`);
+            if (card) card.classList.add('bg-slate-800');
+
+            badge.innerText = `Layer ${layerNum} Active`;
+
+            if (layerNum === 7) {
+                box.innerHTML = `<span class="font-bold text-emerald-400">Layer 7 (Application):</span> Creates human-readable request data such as GET HTTP query or DNS domain request.`;
+            } else if (layerNum === 4) {
+                box.innerHTML = `<span class="font-bold text-blue-400">Layer 4 (Transport):</span> Chooses TCP or UDP protocol, attaches source & destination ports, manages sequencing.`;
+            } else if (layerNum === 3) {
+                box.innerHTML = `<span class="font-bold text-amber-400">Layer 3 (Network):</span> Encapsulates segment into IP packet, adding source & destination IP addresses for internet routing.`;
+            } else if (layerNum === 2) {
+                box.innerHTML = `<span class="font-bold text-purple-400">Layer 2 (Data Link):</span> Adds Ethernet physical MAC addresses for direct node-to-node hop transfers across local switch hardware.`;
+            } else if (layerNum === 1) {
+                box.innerHTML = `<span class="font-bold text-slate-300">Layer 1 (Physical):</span> Modulates raw frame binary bits into physical signals (electricity over copper, light pulses over fiber optic cables).`;
+            }
+        }
+
+        // Handle Canvas Click to select Node
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            let clickedAny = false;
+            Object.values(nodes).forEach(node => {
+                const pos = getNodeCoords(node);
+                const dist = Math.hypot(clickX - pos.x, clickY - pos.y);
+                if (dist <= 25) {
+                    selectNode(node.id);
+                    clickedAny = true;
+                }
+            });
+        });
+
+        // =========================================================================
+        // 7. INITIALIZATION ON LOAD
+        // =========================================================================
+
+        window.onload = function() {
+            resizeCanvas();
+            selectNode('client');
+            renderLoop();
+
+            // Initial demo packet transmission
+            setTimeout(() => {
+                launchScenario('http');
+            }, 800);
+        };
+    </script>
+</body>
+</html>
